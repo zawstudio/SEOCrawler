@@ -1,0 +1,55 @@
+import { chromium, Browser, Page } from 'playwright';
+import { ParseResult } from './htmlParser';
+
+export class PlaywrightParser {
+  private browser: Browser | null = null;
+
+  async initialize(): Promise<void> {
+    this.browser = await chromium.launch({
+      headless: true,
+    });
+  }
+
+  async parsePage(url: string): Promise<ParseResult> {
+    if (!this.browser) {
+      throw new Error('Browser not initialized. Call initialize() first.');
+    }
+
+    const page: Page = await this.browser.newPage();
+
+    try {
+      await page.goto(url, {
+        waitUntil: 'networkidle',
+        timeout: 30000,
+      });
+
+      const title = await page.title();
+      const metaDescription = await page.$eval(
+        'meta[name="description"]',
+        (el) => el.getAttribute('content')
+      ).catch(() => undefined);
+      const h1 = await page.$eval('h1', (el) => el.textContent).catch(() => undefined);
+
+      const links = await page.$$eval('a[href]', (anchors) =>
+        anchors.map((a) => (a as HTMLAnchorElement).href)
+      );
+
+      return {
+        title: title || undefined,
+        metaDescription: metaDescription || undefined,
+        h1: h1?.trim() || undefined,
+        links: [...new Set(links)],
+      };
+    } finally {
+      await page.close();
+    }
+  }
+
+  async close(): Promise<void> {
+    if (this.browser) {
+      await this.browser.close();
+      this.browser = null;
+    }
+  }
+}
+
