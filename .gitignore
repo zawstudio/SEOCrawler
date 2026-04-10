@@ -11,4 +11,5 @@ npm-debug.log*
 *.swo
 coverage/
 .nyc_output/
-
+package-lock.json
+*.test.ts
