@@ -1,12 +1,15 @@
 import * as cheerio from 'cheerio';
 import chalk from 'chalk';
-import { resolveUrl, isValidUrl } from '../utils';
+import { resolveUrl, isValidUrl, normalizeUrl, isSameDomain } from '../utils';
+import { ScrapedLink } from '../types';
 
 export interface ParseResult {
   title?: string;
   metaDescription?: string;
+  canonical?: string;
+  robots?: string;
   h1?: string;
-  links: string[];
+  links: ScrapedLink[];
 }
 
 export class HtmlParser {
@@ -21,6 +24,8 @@ export class HtmlParser {
 
     const title = $('title').first().text().trim() || undefined;
     const metaDescription = $('meta[name="description"]').attr('content')?.trim() || undefined;
+    const canonical = $('link[rel="canonical"]').attr('href')?.trim() || undefined;
+    const robots = $('meta[name="robots"]').attr('content')?.trim() || undefined;
     const h1 = $('h1').first().text().trim() || undefined;
 
     const links = this.extractLinks($, baseUrl);
@@ -28,57 +33,47 @@ export class HtmlParser {
     return {
       title,
       metaDescription,
+      canonical,
+      robots,
       h1,
       links,
     };
   }
 
-  private extractLinks($: cheerio.CheerioAPI, baseUrl: string): string[] {
-    const links: string[] = [];
-    const seenLinks = new Set<string>();
+  private extractLinks($: cheerio.CheerioAPI, baseUrl: string): ScrapedLink[] {
+    const links: ScrapedLink[] = [];
+    const seenUrls = new Set<string>();
 
-    const allLinks = $('a');
-    if (this.debug) {
-      console.log(chalk.magenta('[DEBUG]') + ' ' + chalk.white(`Found ${chalk.bold(allLinks.length)} <a> tags on `) + chalk.gray(baseUrl));
-    }
-
-    $('a').each((_: number, element: any) => {
+    $('a').each((_: number, element) => {
       const href = $(element).attr('href');
       const text = $(element).text().trim();
+      const rel = $(element).attr('rel') || '';
+      
+      if (!href) return;
 
-      if (this.debug && href) {
-        console.log(chalk.gray(`  Link: "${href}" (text: "${text.substring(0, 30)}...")`));
-      }
-
-      if (href) {
-        const absoluteUrl = resolveUrl(baseUrl, href);
-
-        if (this.debug) {
-          console.log(chalk.blue(`    → Resolved to: `) + chalk.gray(absoluteUrl));
-          const validColor = isValidUrl(absoluteUrl) ? chalk.green : chalk.red;
-          console.log(chalk.blue(`    → Valid: `) + validColor(isValidUrl(absoluteUrl)));
-        }
-
-        if (isValidUrl(absoluteUrl) && !seenLinks.has(absoluteUrl)) {
-          seenLinks.add(absoluteUrl);
-          links.push(absoluteUrl);
-
-          if (this.debug) {
-            console.log(chalk.green(`    [+] Added to links`));
-          }
+      const absoluteUrl = resolveUrl(baseUrl, href);
+      
+      if (isValidUrl(absoluteUrl)) {
+        const normalizedUrl = normalizeUrl(absoluteUrl);
+        
+        if (!seenUrls.has(normalizedUrl)) {
+          seenUrls.add(normalizedUrl);
+          
+          links.push({
+            url: normalizedUrl,
+            originalHref: href,
+            text,
+            isNofollow: rel.toLowerCase().includes('nofollow'),
+            isInternal: isSameDomain(baseUrl, normalizedUrl)
+          });
         }
       }
     });
 
     if (this.debug) {
-      console.log(chalk.magenta('[DEBUG]') + ' ' + chalk.white(`Total unique links found: `) + chalk.bold.green(links.length));
-      links.slice(0, 10).forEach(link => console.log(chalk.gray(`  - ${link}`)));
-      if (links.length > 10) {
-        console.log(chalk.gray(`  ... and ${links.length - 10} more`));
-      }
+      console.log(chalk.magenta('[DEBUG]') + ' ' + chalk.white(`Extracted ${chalk.bold.green(links.length)} unique links from ${baseUrl}`));
     }
 
     return links;
   }
 }
-

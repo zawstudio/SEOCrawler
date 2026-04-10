@@ -11,12 +11,20 @@ export interface CrawlOptions {
   debug?: boolean;
 }
 
+export interface ScrapedLink {
+  url: string;
+  originalHref: string;
+  text: string;
+  isNofollow: boolean;
+  isInternal: boolean;
+}
+
 export interface PageData {
   url: string;
   statusCode: number;
   finalUrl: string;
   depth: number;
-  outgoingLinks: string[];
+  outgoingLinks: ScrapedLink[];
   redirectChain: string[];
   error?: string;
   title?: string;
