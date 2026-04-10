@@ -1,6 +1,6 @@
 import { chromium, Browser, Page } from 'playwright';
 import { ParseResult } from './htmlParser';
-import { ScrapedLink } from '../types';
+import { ScrapedLink, ScrapedImage } from '../types';
 import { normalizeUrl, isSameDomain } from '../utils';
 
 export class PlaywrightParser {
@@ -40,7 +40,14 @@ export class PlaywrightParser {
         (el) => el.getAttribute('content')
       ).catch(() => undefined) || undefined;
 
-      const h1 = await page.$eval('h1', (el) => el.textContent).catch(() => undefined) || undefined;
+      const headings = {
+        h1: await page.$$eval('h1', (els) => els.map((el) => el.textContent?.trim() || '')),
+        h2: await page.$$eval('h2', (els) => els.map((el) => el.textContent?.trim() || '')),
+        h3: await page.$$eval('h3', (els) => els.map((el) => el.textContent?.trim() || '')),
+        h4: await page.$$eval('h4', (els) => els.map((el) => el.textContent?.trim() || '')),
+        h5: await page.$$eval('h5', (els) => els.map((el) => el.textContent?.trim() || '')),
+        h6: await page.$$eval('h6', (els) => els.map((el) => el.textContent?.trim() || '')),
+      };
 
       const rawLinks = await page.$$eval('a[href]', (anchors) =>
         anchors.map((a) => ({
@@ -58,16 +65,30 @@ export class PlaywrightParser {
         isInternal: isSameDomain(url, link.href)
       }));
 
-      // Deduplicate by normalized URL
+      const rawImages = await page.$$eval('img[src]', (imgs) =>
+        imgs.map((img) => ({
+          src: (img as HTMLImageElement).src,
+          alt: (img as HTMLImageElement).alt || '',
+        }))
+      );
+
+      const images: ScrapedImage[] = rawImages.map(img => ({
+        url: normalizeUrl(img.src),
+        alt: img.alt,
+        isInternal: isSameDomain(url, img.src)
+      }));
+
       const uniqueLinks = Array.from(new Map(links.map(l => [l.url, l])).values());
+      const uniqueImages = Array.from(new Map(images.map(i => [i.url, i])).values());
 
       return {
         title: title || undefined,
         metaDescription: metaDescription || undefined,
         canonical,
         robots,
-        h1: h1?.trim() || undefined,
+        headings,
         links: uniqueLinks,
+        images: uniqueImages,
       };
     } finally {
       await page.close();

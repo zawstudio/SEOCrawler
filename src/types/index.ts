@@ -19,17 +19,31 @@ export interface ScrapedLink {
   isInternal: boolean;
 }
 
+export interface ScrapedImage {
+  url: string;
+  alt: string;
+  isInternal: boolean;
+}
+
 export interface PageData {
   url: string;
   statusCode: number;
   finalUrl: string;
   depth: number;
   outgoingLinks: ScrapedLink[];
+  images: ScrapedImage[];
+  headings: {
+    h1: string[];
+    h2: string[];
+    h3: string[];
+    h4: string[];
+    h5: string[];
+    h6: string[];
+  };
   redirectChain: string[];
   error?: string;
   title?: string;
   metaDescription?: string;
-  h1?: string;
   loadTime?: number;
 }
 
