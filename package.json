@@ -8,6 +8,8 @@
     "build": "tsc",
     "start": "npm run build && node dist/index.js",
     "dev": "ts-node src/index.ts",
+    "test": "vitest",
+    "test:coverage": "vitest run --coverage",
     "clean": "rimraf dist output"
   },
   "dependencies": {
@@ -26,7 +28,9 @@
     "@types/node": "^20.10.5",
     "rimraf": "^5.0.5",
     "ts-node": "^10.9.2",
-    "typescript": "^5.5.3"
+    "typescript": "^5.5.3",
+    "vitest": "^1.4.0",
+    "@vitest/coverage-v8": "^1.4.0"
   },
   "private": true
 }
